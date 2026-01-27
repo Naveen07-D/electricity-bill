@@ -1,0 +1,175 @@
+<?php
+require_once 'db.php';
+checkLogin();
+
+if (!isset($_GET['id'])) {
+    header("Location: index.php");
+    exit();
+}
+
+$bill_id = $_GET['id'];
+
+$sql = "SELECT b.*, c.*, u.username as generated_by_name 
+        FROM bills b 
+        JOIN consumers c ON b.consumer_id = c.id 
+        JOIN users u ON b.generated_by = u.id 
+        WHERE b.id = $bill_id";
+$result = mysqli_query($conn, $sql);
+
+if (mysqli_num_rows($result) == 0) {
+    die("Bill not found!");
+}
+
+$bill = mysqli_fetch_assoc($result);
+
+if ($_SESSION['role'] == 'consumer') {
+    $consumer_sql = "SELECT id FROM consumers WHERE user_id = {$_SESSION['user_id']}";
+    $consumer_result = mysqli_query($conn, $consumer_sql);
+    $consumer_data = mysqli_fetch_assoc($consumer_result);
+    
+    if ($bill['consumer_id'] != $consumer_data['id']) {
+        die("Access denied!");
+    }
+}
+
+$prev_month = date('M', strtotime('-1 month'));
+$curr_month = date('M');
+
+$service_number = $bill['service_number'];
+$uscno = substr($service_number, 0, 3) . substr($bill['phone'], -3) . '046';
+$area_code = '046';
+
+$sub_total = $bill['total_amount'];
+$amount_after_due = $sub_total + 150;
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Electricity Bill</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <style>
+        .bill-container {
+            width: 650px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 2px solid #333;
+            font-family: 'Courier New', monospace;
+            background: white;
+            font-size: 14px;
+        }
+        .bill-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .bill-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .bill-section {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        .bill-title {
+            font-weight: bold;
+            text-align: center;
+            background: #f0f0f0;
+            padding: 5px;
+            margin: -10px -10px 10px -10px;
+        }
+        .amount-box {
+            border: 2px solid #333;
+            padding: 15px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .print-btn {
+            text-align: center;
+            margin: 20px;
+        }
+        .field-label {
+            width: 200px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="bill-container">
+        <div class="bill-header">
+            <h2>ELECTRICITY BILL</h2>
+        </div>
+        
+        <div class="bill-row">
+            <div>SC NO: <?php echo $service_number; ?></div>
+            <div>USCNO: <?php echo $uscno; ?></div>
+            <div>AREA: <?php echo $area_code; ?></div>
+        </div>
+        
+        <div class="bill-row">
+            <div>NAME: <?php echo strtoupper($bill['name']); ?></div>
+        </div>
+        
+        <div class="bill-row">
+            <div>ADDR: <?php echo strtoupper(substr($bill['address'], 0, 50)); ?></div>
+        </div>
+        
+        <div class="bill-row">
+            <div>CAT: <?php echo substr($bill['service_type'], 0, 1); ?></div>
+        </div>
+        
+        <div class="bill-section">
+            <div class="bill-title">READING DETAILS</div>
+            <div class="bill-row">
+                <div>PRES: <?php echo $bill['current_reading']; ?></div>
+                <div>MONTH: <?php echo $curr_month; ?></div>
+                <div>PREV: <?php echo $bill['previous_reading']; ?></div>
+                <div>MONTH: <?php echo $prev_month; ?></div>
+            </div>
+            <div class="bill-row" style="justify-content: center; font-weight: bold;">
+                UNITS: <?php echo $bill['units']; ?>
+            </div>
+        </div>
+        
+        <div class="amount-box">
+            <div class="bill-row">
+                <div>Bill Amount:</div>
+                <div>₹<?php echo $bill['amount']; ?></div>
+            </div>
+            
+            <div class="bill-row">
+                <div>Previous Pending:</div>
+                <div>₹<?php echo $bill['previous_pending']; ?></div>
+            </div>
+            
+            <div class="bill-row">
+                <div>Sub Total:</div>
+                <div>₹<?php echo $sub_total; ?></div>
+            </div>
+            
+            <div class="bill-row">
+                <div>Due Date:</div>
+                <div><?php echo $bill['due_date']; ?></div>
+            </div>
+            
+            <div class="bill-row" style="font-weight: bold; border-top: 1px solid #333; padding-top: 10px;">
+                <div>Amount After Due Date:</div>
+                <div>₹<?php echo $amount_after_due; ?></div>
+            </div>
+        </div>
+        
+        <div class="bill-row" style="justify-content: center; margin-top: 20px;">
+            <div>Bill Generated By: <?php echo $bill['generated_by_name']; ?></div>
+            <div>Date: <?php echo $bill['bill_date']; ?></div>
+        </div>
+        
+        <div class="print-btn">
+            <button onclick="window.print()" class="btn">Print Bill</button>
+            <a href="<?php echo ($_SESSION['role'] == 'consumer') ? 'consumer/dashboard.php' : 'index.php'; ?>" class="btn">Back</a>
+        </div>
+    </div>
+</body>
+</html>
